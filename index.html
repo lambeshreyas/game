@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Running Game</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body {
             background-color: #5d9ee7; /* Sky blue */
@@ -24,7 +25,9 @@
             width: 90%;
             max-width: 600px;
             height: 300px;
-            background: linear-gradient(#b0e0e6, #87CEEB);
+            background-image: url("https://github.com/lambeshreyas/game/blob/main/1000390891.png?raw=true");
+            background-repeat: repeat-x;
+            background-size: auto 100%;
             border: 5px solid #4CAF50;
             position: relative;
             overflow: hidden;
@@ -42,44 +45,37 @@
         }
 
         #character {
-            width: 30px;
-            height: 30px;
-            background-color: #FF5722;
+            width: 100px;
+            height: 80px;
             position: absolute;
-            bottom: 50%;
             left: 20px;
-            border-radius: 50%;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            object-fit: contain;
             transition: transform 0.1s ease-out;
-            animation: floating 2s infinite ease-in-out;
         }
 
-        @keyframes floating {
-            0% { transform: translateY(0); }
-            50% { transform: translateY(-10px); }
-            100% { transform: translateY(0); }
-        }
-
-        .obstacle {
-            width: 25px;
-            height: 100px;
-            background-color: #795548;
+        .obstacle-container {
+            width: 60px;
             position: absolute;
+            height: 100%;
             bottom: 0;
-            right: -25px;
-            border-radius: 5px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            right: -60px;
+            pointer-events: none; /* Prevents the container from blocking clicks/taps */
+        }
+        
+        /* Styles for the mountain image obstacles */
+        .obstacle-image {
+            width: 100%;
+            position: absolute;
+            object-fit: fill;
         }
 
-        .obstacle-top {
-            width: 25px;
-            height: 100px;
-            background-color: #795548;
-            position: absolute;
+        .obstacle-image.bottom {
+            bottom: 0;
+        }
+
+        .obstacle-image.top {
             top: 0;
-            right: -25px;
-            border-radius: 5px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transform: scaleY(-1); /* Flips the image to create the top mountain */
         }
 
         #score-container {
@@ -119,7 +115,7 @@
             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
             transition: transform 0.1s ease-in-out;
         }
-        
+
         #restart-button:hover {
             transform: translateY(-2px);
             background-color: #45a049;
@@ -135,7 +131,7 @@
 <body>
     <div id="game-container">
         <div id="ground"></div>
-        <div id="character"></div>
+        <img id="character" src="https://raw.githubusercontent.com/lambeshreyas/game/main/hanuman.png" alt="Character">
     </div>
     <div id="score-container">
         Score: <span id="score">0</span>
@@ -156,118 +152,140 @@
 
         let score = 0;
         let isGameOver = false;
-        let characterY = 150; // Initial Y position
+        let characterY = 150; 
         let characterVelocityY = 0;
         const gravity = 0.5;
         const lift = -8;
         let obstacles = [];
         let lastObstacleTime = 0;
+        const obstacleSpawnInterval = 2000; // milliseconds
+        let gameSpeed = 200; // pixels per second
+        let lastFrameTime = 0;
         let frameId = null;
+        let backgroundPositionX = 0; // Tracks the background position
+        
+        const obstacleImgUrl = "https://raw.githubusercontent.com/lambeshreyas/game/main/1000390891.png";
 
         function updateScore() {
-            if (!isGameOver) {
-                score++;
-                scoreDisplay.textContent = score;
-            }
+            score++;
+            scoreDisplay.textContent = score;
         }
 
         function createObstacle() {
-            const obstacleHeight = Math.floor(Math.random() * 100) + 50; // Random height for top part
-            const gap = Math.floor(Math.random() * 50) + 90; // Random gap size
+            const obstacleWidth = 60;
+            const obstacleHeight = Math.floor(Math.random() * (gameContainer.clientHeight - 180)) + 40;
+            const gap = 120; // Fixed gap size
 
-            const obstacleBottom = document.createElement('div');
-            obstacleBottom.classList.add('obstacle');
-            obstacleBottom.style.height = `${obstacleHeight}px`;
-            gameContainer.appendChild(obstacleBottom);
+            const obstacleContainer = document.createElement('div');
+            obstacleContainer.classList.add('obstacle-container');
+            obstacleContainer.style.width = `${obstacleWidth}px`;
+            gameContainer.appendChild(obstacleContainer);
 
-            const obstacleTop = document.createElement('div');
-            obstacleTop.classList.add('obstacle-top');
-            obstacleTop.style.height = `${gameContainer.clientHeight - obstacleHeight - gap - 30}px`;
-            gameContainer.appendChild(obstacleTop);
+            // Create bottom obstacle image
+            const obstacleBottomImg = document.createElement('img');
+            obstacleBottomImg.src = obstacleImgUrl;
+            obstacleBottomImg.classList.add('obstacle-image', 'bottom');
+            obstacleBottomImg.style.height = `${obstacleHeight}px`;
+            obstacleContainer.appendChild(obstacleBottomImg);
 
-            obstacles.push({ elementBottom: obstacleBottom, elementTop: obstacleTop });
+            // Create top obstacle image
+            const obstacleTopImg = document.createElement('img');
+            obstacleTopImg.src = obstacleImgUrl;
+            obstacleTopImg.classList.add('obstacle-image', 'top');
+            obstacleTopImg.style.height = `${gameContainer.clientHeight - obstacleHeight - gap - 30}px`;
+            obstacleContainer.appendChild(obstacleTopImg);
+
+            obstacles.push({
+                element: obstacleContainer,
+                passed: false
+            });
         }
 
         function checkCollisions() {
             const charRect = character.getBoundingClientRect();
-            const containerRect = gameContainer.getBoundingClientRect();
-            
-            // Check for collision with ground
-            // Use container-relative coordinates for accurate collision detection
-            if (charRect.bottom >= containerRect.bottom - 30) {
-                 gameOver();
-            }
 
-            // Check for collision with obstacles
+            // Create a smaller, more accurate hitbox for the character
+            const hitboxPadding = 20; // Adjusted for the new image shape
+            const charHitbox = {
+                left: charRect.left + hitboxPadding,
+                right: charRect.right - hitboxPadding,
+                top: charRect.top + hitboxPadding,
+                bottom: charRect.bottom - hitboxPadding
+            };
+
             for (let i = 0; i < obstacles.length; i++) {
-                const obsBottomRect = obstacles[i].elementBottom.getBoundingClientRect();
-                const obsTopRect = obstacles[i].elementTop.getBoundingClientRect();
-
-                // Check for horizontal overlap
-                const horizontalOverlap = (charRect.right > obsBottomRect.left && charRect.left < obsBottomRect.right);
-
-                // Check for vertical overlap with bottom obstacle
-                const collisionBottom = horizontalOverlap && (charRect.bottom > obsBottomRect.top);
+                const obstacle = obstacles[i].element;
+                const obsRect = obstacle.getBoundingClientRect();
                 
-                // Check for vertical overlap with top obstacle
-                const collisionTop = horizontalOverlap && (charRect.top < obsTopRect.bottom);
+                const horizontalOverlap = (charHitbox.right > obsRect.left && charHitbox.left < obsRect.right);
 
-                if (collisionBottom || collisionTop) {
-                    gameOver();
-                    break;
+                if (horizontalOverlap) {
+                    const obstacleBottomImg = obstacle.querySelector('.obstacle-image.bottom');
+                    const obstacleTopImg = obstacle.querySelector('.obstacle-image.top');
+                    
+                    const obsBottomRect = obstacleBottomImg.getBoundingClientRect();
+                    const obsTopRect = obstacleTopImg.getBoundingClientRect();
+
+                    const collisionBottom = charHitbox.bottom > obsBottomRect.top;
+                    const collisionTop = charHitbox.top < obsTopRect.bottom;
+
+                    if (collisionBottom || collisionTop) {
+                        gameOver();
+                        break;
+                    }
+                }
+                
+                if (!obstacles[i].passed && charHitbox.left > obsRect.right) {
+                    obstacles[i].passed = true;
+                    updateScore();
                 }
             }
         }
 
         function gameLoop(timestamp) {
-            if (isGameOver) {
-                return;
-            }
+            if (isGameOver) return;
+            
+            const deltaTime = (timestamp - lastFrameTime) / 1000;
+            lastFrameTime = timestamp;
 
-            // Character movement
             characterVelocityY += gravity;
             characterY += characterVelocityY;
-            character.style.bottom = `${characterY}px`;
-            
-            // Boundary checking
-            if (characterY <= 0) {
+
+            const groundHeight = 30;
+            const topBoundary = gameContainer.clientHeight - character.offsetHeight - groundHeight;
+            if (characterY < 0) {
                 characterY = 0;
                 characterVelocityY = 0;
-            } else if (characterY >= gameContainer.clientHeight - character.offsetHeight - 30) {
-                 characterY = gameContainer.clientHeight - character.offsetHeight - 30;
-                 characterVelocityY = 0;
+            } else if (characterY > topBoundary) {
+                characterY = topBoundary;
+                characterVelocityY = 0;
             }
 
-            // Obstacle generation and movement
-            const now = timestamp;
-            if (now - lastObstacleTime > 2000) {
+            character.style.bottom = `${characterY}px`;
+            checkCollisions();
+
+            if (timestamp - lastObstacleTime > obstacleSpawnInterval) {
                 createObstacle();
-                lastObstacleTime = now;
+                lastObstacleTime = timestamp;
             }
 
+            const obstacleMoveDistance = gameSpeed * deltaTime;
             for (let i = obstacles.length - 1; i >= 0; i--) {
-                const obsBottom = obstacles[i].elementBottom;
-                const obsTop = obstacles[i].elementTop;
+                const obstacle = obstacles[i].element;
+                let rightPos = parseFloat(getComputedStyle(obstacle).right);
+                rightPos += obstacleMoveDistance;
+                obstacle.style.right = `${rightPos}px`;
 
-                let rightPosBottom = parseFloat(getComputedStyle(obsBottom).right);
-                let rightPosTop = parseFloat(getComputedStyle(obsTop).right);
-                
-                rightPosBottom += 2; // Move speed
-                rightPosTop += 2;
-
-                obsBottom.style.right = `${rightPosBottom}px`;
-                obsTop.style.right = `${rightPosTop}px`;
-
-                // Remove off-screen obstacles
-                if (rightPosBottom > gameContainer.offsetWidth) {
-                    gameContainer.removeChild(obsBottom);
-                    gameContainer.removeChild(obsTop);
+                if (rightPos > gameContainer.offsetWidth) {
+                    gameContainer.removeChild(obstacle);
                     obstacles.splice(i, 1);
-                    updateScore();
                 }
             }
 
-            checkCollisions();
+            // Move the background
+            backgroundPositionX += obstacleMoveDistance;
+            gameContainer.style.backgroundPositionX = `-${backgroundPositionX}px`;
+
             frameId = requestAnimationFrame(gameLoop);
         }
 
@@ -278,7 +296,6 @@
             gameOverScreen.style.display = "block";
         }
 
-        // Reverted to a non-page-refresh restart for better performance
         function restartGame() {
             isGameOver = false;
             score = 0;
@@ -287,40 +304,39 @@
             characterVelocityY = 0;
             gameOverScreen.style.display = "none";
 
-            // Clear all obstacles
             obstacles.forEach(obs => {
-                gameContainer.removeChild(obs.elementBottom);
-                gameContainer.removeChild(obs.elementTop);
+                gameContainer.removeChild(obs.element);
             });
             obstacles = [];
 
-            lastObstacleTime = 0;
+            lastFrameTime = performance.now();
+            lastObstacleTime = performance.now();
+            backgroundPositionX = 0; // Reset background position
+            character.style.bottom = `${characterY}px`;
             frameId = requestAnimationFrame(gameLoop);
         }
 
-        // Controls
         function moveCharacterUp() {
             characterVelocityY = lift;
-        }
-        
-        function moveCharacterDown() {
-             characterVelocityY = -lift;
         }
 
         document.addEventListener("keydown", function(event) {
             if (!isGameOver) {
-                if (event.key === "ArrowUp") {
-                     moveCharacterUp();
-                } else if (event.key === "ArrowDown") {
-                     moveCharacterDown();
+                if (event.key === "ArrowUp" || event.key === " ") {
+                    moveCharacterUp();
                 }
             }
         });
 
-        document.addEventListener("touchstart", function() {
-             if (!isGameOver) {
-                 moveCharacterUp();
-             }
+        gameContainer.addEventListener("mousedown", function() {
+            if (!isGameOver) {
+                moveCharacterUp();
+            }
+        });
+        gameContainer.addEventListener("touchstart", function() {
+            if (!isGameOver) {
+                moveCharacterUp();
+            }
         });
 
         restartButton.addEventListener("click", restartGame);
