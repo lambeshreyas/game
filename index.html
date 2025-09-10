@@ -156,7 +156,7 @@
 
         function createObstacle() {
             // Increased the obstacle width for a wider obstacle.
-            const obstacleWidth = 160;
+            const obstacleWidth = 80;
             const obstacleHeight = 100; // A "normal" size for the obstacle
             const groundHeight = 30;
 
@@ -308,7 +308,7 @@
             frameId = requestAnimationFrame(gameLoop);
         }
 
-        // Renamed function to reflect that it only sets the jumping state.
+        // Sets the jumping state for continuous movement on long press/key hold.
         function startJump() {
             if(!isGameOver) {
                isJumping = true;
@@ -324,6 +324,7 @@
 
         document.addEventListener("keydown", function(event) {
             if (event.key === "ArrowUp" || event.key === " ") {
+                // If game is over, restart. Otherwise, start a continuous jump.
                 if(isGameOver) {
                     restartGame();
                 } else {
@@ -332,34 +333,45 @@
             }
         });
         
-        // New event listener to stop the jump when the key is released.
+        // Stops the continuous jump when the key is released.
         document.addEventListener("keyup", function(event) {
             if (event.key === "ArrowUp" || event.key === " ") {
                 isJumping = false;
             }
         });
-
-        document.body.addEventListener("mousedown", function() {
-            if(isGameOver) {
-                restartGame();
-            } else {
-                singleJump();
-            }
-        });
+        
+        // New event listeners for touch and mouse
+        // Start continuous jump on touch start or mouse down.
         document.body.addEventListener("touchstart", function(e) {
             e.preventDefault();
-            if(isGameOver) {
-                restartGame();
-            } else {
-                singleJump();
+            if (!isGameOver) {
+                startJump();
             }
         });
 
-        restartButton.addEventListener("click", function(e){
-            e.stopPropagation();
+        document.body.addEventListener("mousedown", function(e) {
+            if (!isGameOver) {
+                startJump();
+            }
+        });
+
+        // Stop continuous jump on touch end or mouse up.
+        document.body.addEventListener("touchend", function() {
+            isJumping = false;
+        });
+
+        document.body.addEventListener("mouseup", function() {
+            isJumping = false;
+        });
+
+        // Event listener on the game over screen to restart the game
+        gameOverScreen.addEventListener("click", function() {
             restartGame();
         });
 
+        // Remove the original restart button listener as it's now redundant
+        // with the new game-over-screen listener that handles all clicks.
+        
         window.onload = function() {
             gameOverScreen.style.display = "block";
             finalScoreDisplay.textContent = "0";
