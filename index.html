@@ -124,6 +124,9 @@
         <button id="restart-button">Restart</button>
         <p id="controls-info">Controls: Arrow keys or tap to fly.</p>
     </div>
+    <!-- Audio element for background music -->
+    <audio id="background-music" src="https://raw.githubusercontent.com/lambeshreyas/game/main/shree-raghuvar-ki-vanar-sena_doaaSpj2.mp3" loop></audio>
+
     <script>
         const gameContainer = document.getElementById("game-container");
         const character = document.getElementById("character");
@@ -131,21 +134,22 @@
         const gameOverScreen = document.getElementById("game-over-screen");
         const finalScoreDisplay = document.getElementById("final-score");
         const restartButton = document.getElementById("restart-button");
+        const backgroundMusic = document.getElementById("background-music"); // Get the audio element
 
         let score = 0;
         let isGameOver = false;
-        let isJumping = false; // New variable to track if the jump key is held down
+        let isJumping = false;
         let characterY = 150; 
         let characterVelocityY = 0;
         const gravity = 0.5;
         const lift = -8;
         let obstacles = [];
         let lastObstacleTime = 0;
-        const obstacleSpawnInterval = 1200; // milliseconds. Decreased for more obstacles.
-        let gameSpeed = 200; // pixels per second
+        const obstacleSpawnInterval = 1200;
+        let gameSpeed = 200;
         let lastFrameTime = 0;
         let frameId = null;
-        let backgroundPositionX = 0; // Tracks the background position
+        let backgroundPositionX = 0;
         
         const obstacleImgUrl = "https://github.com/lambeshreyas/game/blob/main/1000391014.gif?raw=true";
 
@@ -155,9 +159,8 @@
         }
 
         function createObstacle() {
-            // Increased the obstacle width for a wider obstacle.
             const obstacleWidth = 80;
-            const obstacleHeight = 100; // A "normal" size for the obstacle
+            const obstacleHeight = 100;
             const groundHeight = 30;
 
             const obstacle = document.createElement('img');
@@ -168,7 +171,6 @@
             obstacle.style.position = 'absolute';
             obstacle.style.right = `-${obstacleWidth}px`;
 
-            // Randomize vertical position, ensuring it's above the ground
             const maxBottom = gameContainer.clientHeight - obstacleHeight - groundHeight;
             const randomBottomValue = Math.floor(Math.random() * maxBottom) + groundHeight;
             obstacle.style.bottom = `${randomBottomValue}px`;
@@ -184,8 +186,7 @@
         function checkCollisions() {
             const charRect = character.getBoundingClientRect();
 
-            // Create a smaller, more accurate hitbox for the character
-            const hitboxPadding = 20; // Adjusted for the new image shape
+            const hitboxPadding = 20;
             const charHitbox = {
                 left: charRect.left + hitboxPadding,
                 right: charRect.right - hitboxPadding,
@@ -197,7 +198,6 @@
                 const obstacle = obstacles[i].element;
                 const obsRect = obstacle.getBoundingClientRect();
                 
-                // Check for overlap
                 if (
                     charHitbox.right > obsRect.left &&
                     charHitbox.left < obsRect.right &&
@@ -224,7 +224,6 @@
             const deltaTime = (timestamp - lastFrameTime) / 1000;
             lastFrameTime = timestamp;
 
-            // Apply upward force continuously if the jump key is held down
             if (isJumping) {
                 characterVelocityY = lift;
             }
@@ -236,21 +235,17 @@
             const groundTop = gameContainer.clientHeight - groundHeight;
             const characterBottom = characterY + character.offsetHeight;
             
-            // Check if the character is hitting the ground.
             if (characterBottom >= groundTop) {
                 characterY = groundTop - character.offsetHeight;
                 characterVelocityY = 0;
-                // Stop the continuous upward force once the character lands
                 isJumping = false; 
             } 
             
-            // Check if the character is hitting the ceiling.
             if (characterY < 0) {
                  characterY = 0;
                  characterVelocityY = 0;
             }
 
-            // The 'bottom' CSS property should be the distance of the character's bottom from the game container's bottom.
             const characterBottomPos = gameContainer.clientHeight - (characterY + character.offsetHeight);
             character.style.bottom = `${characterBottomPos}px`;
             
@@ -274,8 +269,7 @@
                 }
             }
 
-            // Move the background
-            backgroundPositionX -= obstacleMoveDistance * 0.5; // Slower scroll for parallax effect
+            backgroundPositionX -= obstacleMoveDistance * 0.5;
             gameContainer.style.backgroundPositionX = `${backgroundPositionX}px`;
 
             frameId = requestAnimationFrame(gameLoop);
@@ -286,6 +280,8 @@
             cancelAnimationFrame(frameId);
             finalScoreDisplay.textContent = score;
             gameOverScreen.style.display = "block";
+            backgroundMusic.pause();
+            backgroundMusic.currentTime = 0;
         }
 
         function restartGame() {
@@ -303,19 +299,23 @@
 
             lastFrameTime = 0;
             lastObstacleTime = performance.now();
-            backgroundPositionX = 0; // Reset background position
+            backgroundPositionX = 0;
             character.style.bottom = `150px`;
+            
+            // This is the code that plays the music. It must be called from a user interaction.
+            backgroundMusic.play().catch(error => {
+                console.error("Autoplay was prevented:", error);
+            });
+
             frameId = requestAnimationFrame(gameLoop);
         }
 
-        // Sets the jumping state for continuous movement on long press/key hold.
         function startJump() {
             if(!isGameOver) {
                isJumping = true;
             }
         }
         
-        // This function will handle single jumps from mouse/touch.
         function singleJump() {
             if (!isGameOver) {
                 characterVelocityY = lift;
@@ -324,7 +324,6 @@
 
         document.addEventListener("keydown", function(event) {
             if (event.key === "ArrowUp" || event.key === " ") {
-                // If game is over, restart. Otherwise, start a continuous jump.
                 if(isGameOver) {
                     restartGame();
                 } else {
@@ -333,15 +332,12 @@
             }
         });
         
-        // Stops the continuous jump when the key is released.
         document.addEventListener("keyup", function(event) {
             if (event.key === "ArrowUp" || event.key === " ") {
                 isJumping = false;
             }
         });
         
-        // New event listeners for touch and mouse
-        // Start continuous jump on touch start or mouse down.
         document.body.addEventListener("touchstart", function(e) {
             e.preventDefault();
             if (!isGameOver) {
@@ -355,7 +351,6 @@
             }
         });
 
-        // Stop continuous jump on touch end or mouse up.
         document.body.addEventListener("touchend", function() {
             isJumping = false;
         });
@@ -364,13 +359,9 @@
             isJumping = false;
         });
 
-        // Event listener on the game over screen to restart the game
         gameOverScreen.addEventListener("click", function() {
             restartGame();
         });
-
-        // Remove the original restart button listener as it's now redundant
-        // with the new game-over-screen listener that handles all clicks.
         
         window.onload = function() {
             gameOverScreen.style.display = "block";
